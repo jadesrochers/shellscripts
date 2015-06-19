@@ -21,35 +21,32 @@ for j in $(seq 0 $numBackups); do
 
 # get the current time every loop so that the timestamp on the backup reflects when it was started
 currentTime=$(date "+%Y %j %H %M")
-LITYEAR=$(cut -d " " -f 1 <<<"$currentTime")
-LITJDAY=$(cut -d " " -f 2 <<<"$currentTime")
-LITHOUR=$(cut -d " " -f 3 <<<"$currentTime")
-LITMIN=$(cut -d " " -f 4 <<<"$currentTime")
+timeArray=($currentTime)
 
-# get the current year, mo, day in numerical format
-declare -i CURYEAR=$((cut -d " " -f 1 | sed -r 's/^0*//') <<<"$currentTime")
-declare -i CURJDAY=$((cut -d " " -f 2 | sed -r 's/^0*//') <<<"$currentTime")
-declare -i CURHOUR=$((cut -d " " -f 3 | sed -r 's/^0*//') <<<"$currentTime")
-declare -i CURMIN=$((cut -d " " -f 4 | sed -r 's/^0*//') <<<"$currentTime")
+# get the current year, mo, day in numerical format with a loop
+curTime=($(for j in ${timeArray[@]}; do sed -r 's/^0*//' <<<$j; done))
 
 #sourceDir=$(sed -r -e 's/[^\/].*\///' -e 's/(.*[a-zA-Z])_/\1/' <<<"${j}") extract source from path
 currBackHome=($(find $backLocation -maxdepth 1 -regextype posix-egrep -regex "$backLocation${hostNames[${j}]}_${catName[${j}]}_[[:digit:]]{4}_[[:digit:]]{3}_[[:digit:]]{2}_[[:digit:]]{2}$"))
 
  if [[ ${#currBackHome[@]} -gt 1 && ${#currBackHome[@]} -lt 3  ]]; then
  echo "there were two existing directories"
- newBackHome="${backLocation}${hostNames[$j]}_${catName[${j}]}_${LITYEAR}_${LITJDAY}_${LITHOUR}_${LITMIN}"
+ newBackHome="${backLocation}${hostNames[$j]}_${catName[${j}]}_${timeArray[0]}_${timeArray[1]}_${timeArray[2]}_${timeArray[3]}"
  sortedHome=($(printf '%s\n' "${currBackHome[@]}"|sort -r ))
 	   # this for loop is a good candidate to turn into a function
 	   for j2 in {0..1}; do
-	   DIRDATE[$j2]=$(sed -r -e 's/.*\///' -e 's/.*[a-zA-Z]_//' <<<"${sortedHome[$j2]}");  echo "the current dirdate: ${DIRDATE[$j2]}"
-	   declare -i DIRMIN=$(echo ${DIRDATE[$j2]} | cut -c 13-14 | sed -r 's/^0*//')
-	   declare -i DIRHOUR=$(echo ${DIRDATE[$j2]} | cut -c 10-11 |  sed -r 's/^0*//')
-	   declare -i DIRDAY=$(echo ${DIRDATE[$j2]} | cut -c 6-8 |  sed -r 's/^0*//')
-	   declare -i DIRYEAR=$(echo ${DIRDATE[$j2]} | cut -c 1-4 |  sed -r 's/^0*//')
-	   MINDIFF[$j2]=$(($CURMIN-$DIRMIN))
-	   HOURDIFF[$j2]=$(($CURHOUR-$DIRHOUR))
-	   DAYDIFF[$j2]=$(($CURJDAY-$DIRDAY)); echo "the current day: $CURJDAY and the day of the existing directory: $DIRDAY"
-	   YEARDIFF[$j2]=$(($CURYEAR-$DIRYEAR)); echo "the current year: $CURYEAR and the year of the existing directory: $DIRYEAR"
+	   DIRDATE=$(sed -r -e 's/.*\///' -e 's/.*[a-zA-Z]_//' <<<"${sortedHome[$j2]}");  echo "the current dirdate: ${DIRDATE[$j2]}"
+	   IFS_back=$IFS; IFS='_';
+	   dirDate=($DIRDATE); IFS=$IFS_back;
+	   dirTimes=($(for j in ${dirDate[@]}; do sed -r 's/^0*//' <<<$j; done))
+	   # declare -i DIRMIN=$(echo ${DIRDATE[$j2]} | cut -c 13-14 | sed -r 's/^0*//')
+	   # declare -i DIRHOUR=$(echo ${DIRDATE[$j2]} | cut -c 10-11 |  sed -r 's/^0*//')
+	   # declare -i DIRDAY=$(echo ${DIRDATE[$j2]} | cut -c 6-8 |  sed -r 's/^0*//')
+	   # declare -i DIRYEAR=$(echo ${DIRDATE[$j2]} | cut -c 1-4 |  sed -r 's/^0*//')
+	   MINDIFF[$j2]=$((${curTime[3]}-${dirTimes[3]}))
+	   HOURDIFF[$j2]=$((${curTime[2]}-${dirTimes[2]}))
+	   DAYDIFF[$j2]=$((${curTime[1]}-${dirTimes[1]})); echo "the current day: $CURJDAY and the day of the existing directory: $DIRDAY"
+	   YEARDIFF[$j2]=$((${curTime[0]}-${dirTimes[0]})); echo "the current year: $CURYEAR and the year of the existing directory: $DIRYEAR"
 	   done
 	   
 	   # This can run once per day most effectively. This logical statement looks for the oldest backup to be greater than two days 
@@ -59,7 +56,7 @@ currBackHome=($(find $backLocation -maxdepth 1 -regextype posix-egrep -regex "$b
 	    # twice a year run rsync with the delete option to remove files that have disappeared.
 	    # two days should be enough, but running three to be sure.   
 	    if [[ -d ${backSource[$j]} ]]; then    
-	     if [[ (${CURJDAY} -gt 178 && ${CURJDAY} -lt 182) || (${CURJDAY} -gt 358 && ${CURJDAY} -lt 362) ]]; then 
+	     if [[ (${curTime[1]} -gt 178 && ${curTime[1]} -lt 182) || (${curTime[1]} -gt 358 && ${curTime[1]} -lt 362) ]]; then 
 	     echo "updating ${sortedHome[1]} deleting files that no longer exist"
 	     sudo rsync -azx --delete "${backSource[${j}]}"  ${sortedHome[1]}
 	     # options: a - archive, equals rlptgoD; v - verbose, z - compress, x - do not cross filesystems boundaries.
@@ -88,13 +85,13 @@ currBackHome=($(find $backLocation -maxdepth 1 -regextype posix-egrep -regex "$b
  #          for j1 in ${currBackHome[@]}; do rm -rv $j1; done
 	  if [[ $numAdd -gt 0 ]]; then
 	   for ((j3=0; j3<$numAdd; j3++)); do
-	   newBackHome="${backLocation}${hostNames[$j]}_${catName[${j}]}_${LITYEAR}_${LITJDAY}_${LITHOUR}_${LITMIN}"
+	   newBackHome="${backLocation}${hostNames[$j]}_${catName[${j}]}_${timeArray[0]}_${timeArray[1]}_${timeArray[2]}_${timeArray[3]}"
 	   echo "Creating new backup $newBackHome"
 	   sudo rsync -azx "${backSource[${j}]}" $newBackHome
-	   TEMPMIN=$(sed -r -e 's/0([0-9])/\1/' <<< ${LITMIN})
+	   TEMPMIN=$(sed -r -e 's/0([0-9])/\1/' <<< ${timeArray[3]})
 	   ((TEMPMIN++))
 	   [[ ${#TEMPMIN} -lt 2 ]] && TEMPMIN="0$TEMPMIN"
-	   LITMIN=$TEMPMIN
+	   timeArray[3]=$TEMPMIN
 	   echo "Created new backup $newBackHome"
 	   done
 	  fi
