@@ -12,6 +12,11 @@ hostNames=(1701-A1 1701-A1 1701-A1 1701-A1)
 backLocation=/media/jadesrochers/Seagate_D2/
 catName=(Home Pictures Music Root)
 sudo mount -a
+if [[ -d "$backLocation" ]]; then 
+    printf %"sThe backup directory exists/n";
+else
+    exit
+fi
 # set the number of backups you want to have
 numBackups=2; backless=$(((numBackups-1))); backmore=$(((numBackups+1)));
 numSourceLocs=$((${#catName[@]}-1))
@@ -33,7 +38,7 @@ for j in $(seq 0 $numSourceLocs); do
 	# use the field separator to allow array creation ignoring spaces 
 	IFS_back=$IFS; IFS="*"
 	DirCalcDates=($(for k in ${DirDates[@]}; do printf "%s*" "$(sed -r 's/_/ /' <<<$k)"; done));
-	CurVsDirTimeDiff=($(for k in ${DirCalcDates[@]}; do printf "%s*" "$((($(date --date="$currentTime" +%s)-$(date --date="$k" +%s))))"; done))
+	CurVsDirTimeDiff=($(for k in ${DirCalcDates[@]}; do printf "%s*" "$(($(date --date="$currentTime" +%s)-$(date --date="$k" +%s)))"; done))
 	IFS=$IFS_back
 
 	# use the age of the oldest and newest to determine if a backup will be conducted
@@ -51,19 +56,19 @@ for j in $(seq 0 $numSourceLocs); do
 		    rsync -azx  --exclude=/dev --exclude=/run --exclude=/proc --exclude=/mnt --exclude=/media --exclude=/sys --exclude=/home / ${sortedCurBack[NumDiffs]}
 		fi
 		mv ${sortedCurBack[NumDiffs]} $newBack
-		printf "%s\n" "Moved ${sortedCurBack[NumDiffs]} to $newBack"
+		printf "%s\n" "Moved ${sortedCurBack[NumDiffs]} to $newBack\n"
             else
 		printf "%s\n" "there was no ${backSource[$j]} folder to back up right now, problem"    
 	    fi    
 	else
-	    printf "%s\n" "$catName backup up to date for ${hostNames[$j]} on $currentTime"
+	    printf "%s\n\n" "${catName[$j]} backup up to date for ${hostNames[$j]} on $currentTime"
 	fi
     else  
 	numSourceLocs=${#currBack[@]}
         printf "%s\n" "There were $numSourceLocs existing backups, now going to remove or create to get to two"
 	numRemove=$(($numSourceLocs-2))
 	numAdd=0
-	[[ numRemove -gt 0 ]] && for ((jrm=0; jrm<${numRemove}; jrm++)); do printf "%s\n" "removing ${currBack[jrm]}"; rm -r ${currBack[jrm]}; done
+	[[ numRemove -gt 0 ]] && for ((jrm=0; jrm<${numRemove}; jrm++)); do printf "%s\n\n" "removing ${currBack[jrm]}"; rm -r ${currBack[jrm]}; done
 	[[ numRemove -lt 0 ]] && numAdd=$(echo ${numRemove#-})
 	if [[ $numAdd -gt 0 ]]; then
 	    for ((k=0; k<$numAdd; k++)); do
@@ -74,7 +79,7 @@ for j in $(seq 0 $numSourceLocs); do
 		else
 		    sudo rsync -azx "${backSource[${j}]}" $newBack
 		fi
-		printf "%s\n" "Created new backup $newBack"
+		printf "%s\n\n" "Created new backup $newBack"
 	    done
 	fi
     fi
