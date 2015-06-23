@@ -1,5 +1,5 @@
 #! /bin/bash
-exec 1>> /home/jadesrochers/bin/shellScripts/backup_scripts/log/backupUpdateDv6.log 2>&1
+exec 1>> /home/jadesrochers/bin/shellScripts/backup_scripts/log/backupToExternal.log 2>&1
 printf %"s\n\n\n\n\n"
 # give info about when the run was for the log file
 currentTime=$(date --rfc-3339=seconds)
@@ -13,7 +13,7 @@ backLocation=/media/jadesrochers/Seagate_D2/
 catName=(Home Pictures Music Root)
 sudo mount -a
 if [[ -d "$backLocation" ]]; then 
-    printf %"sThe backup directory exists/n";
+    printf %"sThe backup directory exists\n\n";
 else
     exit
 fi
@@ -47,13 +47,12 @@ for j in $(seq 0 $numSourceLocs); do
 	    curJDay=$(date +%j | sed -r 's/^0+//')
 	    # if the backup source exists, resync it deleting lost files. Git takes care of rolling back
 	    if [[ -d ${backSource[$j]} ]]; then
-		printf "%s\n" "updating ${sortedCurBack[$NumDiffs]} deleting files that no longer exist"
-		sudo rsync -azx --delete "${backSource[${j}]}"  ${sortedCurBack[$NumDiffs]}
-		# options: a - archive, equals rlptgoD; v - verbose, z - compress, x - do not cross filesystems boundaries.
-		# --delete - remove files that no longer exist in the source
 		if [[ "${backSource[$j]}" = "/" ]]; then  # use this if doing root backup
 		    printf "%s\n" "updating root backup: ${sortedCurBack[NumDiffs]} "
-		    rsync -azx  --exclude=/dev --exclude=/run --exclude=/proc --exclude=/mnt --exclude=/media --exclude=/sys --exclude=/home / ${sortedCurBack[NumDiffs]}
+		    rsync -aAX  --delete --delete-excluded --exclude={"/dev/*","/proc/*","/sys/*","/tmp/*","/run/*","/mnt/*","/media/*","/lost+found"} / ${sortedCurBack[NumDiffs]}
+		else
+		    printf "%s\n" "updating ${sortedCurBack[$NumDiffs]} deleting files that no longer exist"
+		    sudo rsync -azx --delete "${backSource[${j}]}"  ${sortedCurBack[$NumDiffs]}
 		fi
 		mv ${sortedCurBack[NumDiffs]} $newBack
 		printf "%s\n" "Moved ${sortedCurBack[NumDiffs]} to $newBack\n"
@@ -75,7 +74,7 @@ for j in $(seq 0 $numSourceLocs); do
 		newBack="${backLocation}${hostNames[$j]}_${catName[${j}]}_$currentTimeStr"
 		printf "%s\n" "Creating new backup $newBack"
 		if [[ "${backSource[$j]}" = "/" ]]; then   # if creating a root backup
-		    rsync -azx  --exclude=/dev --exclude=/run --exclude=/proc --exclude=/mnt --exclude=/media --exclude=/sys --exclude=/home / $newBack
+		    rsync -aAX  --delete  --delete-excluded --exclude={"/dev/*","/proc/*","/sys/*","/tmp/*","/run/*","/mnt/*","/media/*","/lost+found"} / ${sortedCurBack[NumDiffs]}
 		else
 		    sudo rsync -azx "${backSource[${j}]}" $newBack
 		fi
